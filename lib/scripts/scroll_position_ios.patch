@@ -2,7 +2,7 @@ diff --git a/packages/flutter/lib/src/widgets/scroll_position_with_single_contex
 index 96d77f67008..55cefd749b2 100644
 --- a/packages/flutter/lib/src/widgets/scroll_position_with_single_context.dart
 +++ b/packages/flutter/lib/src/widgets/scroll_position_with_single_context.dart
-@@ -127,8 +127,13 @@ class ScrollPositionWithSingleContext extends ScrollPosition implements ScrollAc
+@@ -127,8 +127,14 @@ class ScrollPositionWithSingleContext extends ScrollPosition implements ScrollAc
  
    @override
    void applyUserOffset(double delta) {

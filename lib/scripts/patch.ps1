@@ -139,7 +139,8 @@ foreach ($revert in $reverts) {
 
 foreach ($patch in $patches) {
     git apply "$env:GITHUB_WORKSPACE/$patch"
-    if ($LASTEXITCODE -eq 0) {
-        Write-Host "$patch applied"
+    if ($LASTEXITCODE -ne 0) {
+        throw "$patch failed to apply"
     }
+    Write-Host "$patch applied"
 }
