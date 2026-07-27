@@ -5,13 +5,19 @@ import Flutter
 import QuartzCore
 import UIKit
 
+private protocol PictureInPictureManaging: AnyObject {
+  func prepare(handle: Int64) -> Bool
+  func setPlaying(handle: Int64, playing: Bool)
+  func needsFrame(handle: Int64) -> Bool
+  func consumeFrame(handle: Int64, pixelBuffer: CVPixelBuffer, size: CGSize)
+  func dispose(handle: Int64)
+}
+
 /// Compatibility wrapper: the sample-buffer PiP content source is available on
 /// iOS 15 and later, while PiliPlus still supports iOS 14.
 public final class PictureInPictureManager: NSObject {
   private let channel: FlutterMethodChannel
-
-  @available(iOS 15.0, *)
-  private var implementation: PictureInPictureManagerIOS15?
+  private var implementation: PictureInPictureManaging?
 
   init(channel: FlutterMethodChannel) {
     self.channel = channel
@@ -62,6 +68,7 @@ public final class PictureInPictureManager: NSObject {
 
 @available(iOS 15.0, *)
 private final class PictureInPictureManagerIOS15: NSObject,
+  PictureInPictureManaging,
   AVPictureInPictureControllerDelegate,
   AVPictureInPictureSampleBufferPlaybackDelegate
 {
