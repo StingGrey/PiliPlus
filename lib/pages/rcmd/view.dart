@@ -6,7 +6,6 @@ import 'package:PiliPlus/common/widgets/video_card/video_card_v.dart';
 import 'package:PiliPlus/http/loading_state.dart';
 import 'package:PiliPlus/pages/rcmd/controller.dart';
 import 'package:PiliPlus/utils/grid.dart';
-import 'package:PiliPlus/utils/platform_utils.dart';
 import 'package:PiliPlus/utils/storage_pref.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -28,7 +27,6 @@ class _RcmdPageState extends State<RcmdPage>
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    final optimizeForIPad = PlatformUtils.isIPad(context);
     final colorScheme = ColorScheme.of(context);
     return Container(
       clipBehavior: .hardEdge,
@@ -43,11 +41,7 @@ class _RcmdPageState extends State<RcmdPage>
             SliverPadding(
               padding: const .only(top: Style.cardSpace, bottom: 100),
               sliver: Obx(
-                () => _buildBody(
-                  colorScheme,
-                  controller.loadingState.value,
-                  optimizeForIPad,
-                ),
+                () => _buildBody(colorScheme, controller.loadingState.value),
               ),
             ),
           ],
@@ -67,7 +61,6 @@ class _RcmdPageState extends State<RcmdPage>
   Widget _buildBody(
     ColorScheme colorScheme,
     LoadingState<List<dynamic>?> loadingState,
-    bool optimizeForIPad,
   ) {
     return switch (loadingState) {
       Loading() => _buildSkeleton,
@@ -75,7 +68,6 @@ class _RcmdPageState extends State<RcmdPage>
         response != null && response.isNotEmpty
             ? SliverGrid.builder(
                 gridDelegate: gridDelegate,
-                addAutomaticKeepAlives: !optimizeForIPad,
                 itemBuilder: (context, index) {
                   if (index == response.length - 1) {
                     controller.onLoadMore();

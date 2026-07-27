@@ -44,7 +44,6 @@ $EditableTextPatch = "lib/scripts/editable_text.patch"
 $TextFieldPatch = "lib/scripts/text_field.patch"
 
 $ScrollPositionPatch = "lib/scripts/scroll_position.patch"
-$ScrollPositionIOSPatch = "lib/scripts/scroll_position_ios.patch"
 
 $SelectionPlaceholderPatch = "lib/scripts/selection_placeholder.patch"
 
@@ -83,12 +82,10 @@ $patches = @($ModalBarrierPatch, $TextSelectionPatch, $MouseCursorPatch,
             $EditableTextPatch, $TextFieldPatch,
             $SelectionPlaceholderPatch)
 
-# The upstream FAB patch intentionally skips the first pixel update of every
-# drag on iOS. Keep that behavior on existing platforms, but use the iOS
-# variant that always moves content 1:1 with the finger.
-if ($platform.ToLower() -eq "ios") {
-    $patches += $ScrollPositionIOSPatch
-} else {
+# Keep the app-specific scroll patch on existing platforms. iOS uses Flutter's
+# tested implementation directly; patching applyUserOffset is too risky for the
+# gesture hot path and can disturb scroll notification ordering.
+if ($platform.ToLower() -ne "ios") {
     $patches += $ScrollPositionPatch
 }
 

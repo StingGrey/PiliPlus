@@ -214,7 +214,6 @@ class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
   static ColorScheme? _light, _dark;
-  static bool _didTuneIPadImageCache = false;
 
   static void _onBack() {
     if (SmartDialog.checkExist()) {
@@ -297,15 +296,6 @@ class MyApp extends StatelessWidget {
   static Widget _builder(BuildContext context, Widget? child) {
     final uiScale = Pref.uiScale;
     final mediaQuery = MediaQuery.of(context);
-    if (!_didTuneIPadImageCache && PlatformUtils.isIPad(context)) {
-      final imageCache = PaintingBinding.instance.imageCache;
-      // Keep more full-DPR covers resident on iPad to avoid decoding them again
-      // when the user scrolls back through a wide grid.
-      imageCache
-        ..maximumSize = 1200
-        ..maximumSizeBytes = 192 << 20;
-      _didTuneIPadImageCache = true;
-    }
     final textScaler = TextScaler.linear(Pref.defaultTextScale);
     if (uiScale != 1.0) {
       child = MediaQuery(
