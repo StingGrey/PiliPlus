@@ -89,7 +89,6 @@ class NetworkImgLayer extends StatelessWidget {
     required bool isEmote,
     required bool isAvatar,
   }) {
-    final optimizeForIPad = PlatformUtils.isIPad(context);
     int? memCacheWidth, memCacheHeight;
     if (cacheWidth ?? width <= height) {
       memCacheWidth = width.cacheSize(context);
@@ -97,23 +96,15 @@ class NetworkImgLayer extends StatelessWidget {
       memCacheHeight = height.cacheSize(context);
     }
     return CachedNetworkImage(
-      imageUrl: optimizeForIPad
-          ? ImageUtils.thumbnailUrlForSize(
-              src,
-              maxQuality: quality,
-              targetWidth: memCacheWidth,
-              targetHeight: memCacheHeight,
-            )
-          : ImageUtils.thumbnailUrl(src, quality),
+      imageUrl: ImageUtils.thumbnailUrl(src, quality),
       width: width,
       height: height,
       memCacheWidth: memCacheWidth,
       memCacheHeight: memCacheHeight,
       fit: fit,
       alignment: alignment,
-      // iPad 同屏图片较多，批量透明度动画会增加合成负担。
-      fadeOutDuration: optimizeForIPad ? Duration.zero : fadeOutDuration,
-      fadeInDuration: optimizeForIPad ? Duration.zero : fadeInDuration,
+      fadeOutDuration: fadeOutDuration,
+      fadeInDuration: fadeInDuration,
       filterQuality: FilterQuality.low,
       placeholder: (_, _) =>
           getPlaceHolder?.call() ??

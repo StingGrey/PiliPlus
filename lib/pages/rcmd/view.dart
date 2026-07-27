@@ -31,9 +31,7 @@ class _RcmdPageState extends State<RcmdPage>
     final optimizeForIPad = PlatformUtils.isIPad(context);
     final colorScheme = ColorScheme.of(context);
     return Container(
-      // The scroll view already clips its viewport. Avoid a second rounded
-      // viewport clip on iPad, where five or more columns move every frame.
-      clipBehavior: optimizeForIPad ? .none : .hardEdge,
+      clipBehavior: .hardEdge,
       margin: const .symmetric(horizontal: Style.safeSpace),
       decoration: const BoxDecoration(borderRadius: Style.mdRadius),
       child: refreshIndicator(
@@ -41,9 +39,6 @@ class _RcmdPageState extends State<RcmdPage>
         child: CustomScrollView(
           controller: controller.scrollController,
           physics: const AlwaysScrollableScrollPhysics(),
-          // 横屏 iPad 同屏卡片更多，缩小预构建窗口可避免快速滑动时
-          // 同时触发多行图片解码和纹理上传。
-          cacheExtent: optimizeForIPad ? 96 : null,
           slivers: [
             SliverPadding(
               padding: const .only(top: Style.cardSpace, bottom: 100),

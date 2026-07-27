@@ -299,10 +299,11 @@ class MyApp extends StatelessWidget {
     final mediaQuery = MediaQuery.of(context);
     if (!_didTuneIPadImageCache && PlatformUtils.isIPad(context)) {
       final imageCache = PaintingBinding.instance.imageCache;
-      // iPad 一屏会显示更多卡片，适当扩大缓存可避免回滚时反复解码。
+      // Keep more full-DPR covers resident on iPad to avoid decoding them again
+      // when the user scrolls back through a wide grid.
       imageCache
         ..maximumSize = 1200
-        ..maximumSizeBytes = 128 << 20;
+        ..maximumSizeBytes = 192 << 20;
       _didTuneIPadImageCache = true;
     }
     final textScaler = TextScaler.linear(Pref.defaultTextScale);

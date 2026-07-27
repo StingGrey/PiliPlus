@@ -1,6 +1,5 @@
 import 'dart:math' show pow;
 
-import 'package:PiliPlus/utils/platform_utils.dart';
 import 'package:flutter/widgets.dart' show BuildContext, MediaQuery;
 
 extension ImageExtension on num {
@@ -8,14 +7,7 @@ extension ImageExtension on num {
     if (this == 0) {
       return null;
     }
-    final mediaQuery = MediaQuery.of(context);
-    var decodeScale = mediaQuery.devicePixelRatio;
-    if (PlatformUtils.isIPad(context)) {
-      // iPad 的列表缩略图无需按完整 2x 像素密度解码。1.5x 可减少约
-      // 44% 的解码像素与纹理上传量，同时保持滚动场景下的清晰度。
-      decodeScale = decodeScale.clamp(1.0, 1.5).toDouble();
-    }
-    return (this * decodeScale).round();
+    return (this * MediaQuery.devicePixelRatioOf(context)).round();
   }
 }
 
