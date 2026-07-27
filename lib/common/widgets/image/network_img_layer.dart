@@ -176,7 +176,10 @@ class _IPadDeferredNetworkImageState
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    final nextPosition = Scrollable.maybeOf(context)?.position;
+    final nextPosition = Scrollable.maybeOf(
+      context,
+      axis: Axis.vertical,
+    )?.position;
     if (identical(nextPosition, _position)) return;
     _position?.isScrollingNotifier.removeListener(_handleScrollingChanged);
     _position = nextPosition;
