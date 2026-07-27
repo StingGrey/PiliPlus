@@ -32,6 +32,9 @@ abstract final class SearchNavigation {
     final navigator = Get.key.currentState;
     if (navigator == null) return null;
 
+    // Direct Navigator pushes bypass PageRedirect, which normally synchronizes
+    // named-route query parameters into Get.parameters before page creation.
+    Get.parameters = <String, String?>{...?parameters};
     final route = _IOSSearchPageRoute<T>(
       routeName: routeName,
       parameters: parameters,
