@@ -68,6 +68,8 @@
 		<true/>
 		<key>CADisableMinimumFrameDurationOnPhone</key>
 		<true/>
+		<key>FLTEnableImpeller</key>
+		<true/>
 		<key>UIApplicationSupportsIndirectInputEvents</key>
 		<true/>
 		<key>NSPhotoLibraryUsageDescription</key>

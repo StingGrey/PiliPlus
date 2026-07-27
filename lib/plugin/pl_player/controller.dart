@@ -1,4 +1,4 @@
-import 'dart:async' show StreamSubscription, Timer;
+import 'dart:async' show StreamSubscription, Timer, unawaited;
 import 'dart:convert' show ascii, utf8;
 import 'dart:io' show Platform;
 import 'dart:math' show max, min;
@@ -30,6 +30,7 @@ import 'package:PiliPlus/plugin/pl_player/models/play_repeat.dart';
 import 'package:PiliPlus/plugin/pl_player/models/play_status.dart';
 import 'package:PiliPlus/plugin/pl_player/models/video_fit_type.dart';
 import 'package:PiliPlus/plugin/pl_player/utils/fullscreen.dart';
+import 'package:PiliPlus/services/ios_picture_in_picture.dart';
 import 'package:PiliPlus/services/service_locator.dart';
 import 'package:PiliPlus/utils/accounts.dart';
 import 'package:PiliPlus/utils/android/android_helper.dart';
@@ -759,6 +760,10 @@ class PlPlayerController with BlockConfigMixin {
       ),
     );
 
+    if (Platform.isIOS && autoPiP) {
+      await IOSPictureInPictureService.instance.attach(player);
+    }
+
     player.setMediaHeader(userAgent: BrowserUa.pc, referer: HttpString.baseUrl);
 
     _startListeners(player);
@@ -788,6 +793,9 @@ class PlPlayerController with BlockConfigMixin {
       player = await _initPlayer();
       if (_playerCount == 0) {
         _removeListeners();
+        if (Platform.isIOS) {
+          await IOSPictureInPictureService.instance.detach(player);
+        }
         player.dispose();
         player = null;
         _videoController = null;
@@ -916,6 +924,9 @@ class PlPlayerController with BlockConfigMixin {
       /// playing
       stream.playing.listen((bool playing) {
         WakelockPlus.toggle(enable: playing);
+        if (Platform.isIOS && autoPiP) {
+          unawaited(IOSPictureInPictureService.instance.setPlaying(playing));
+        }
         if (playing) {
           if (_isAutoEnterPip) {
             if (_isCurrVideoPage) {
@@ -1599,7 +1610,11 @@ class PlPlayerController with BlockConfigMixin {
     if (kDebugMode) {
       debugPrint('dispose player');
     }
-    _videoPlayerController?.dispose();
+    final player = _videoPlayerController;
+    if (Platform.isIOS && player != null) {
+      unawaited(IOSPictureInPictureService.instance.detach(player));
+    }
+    player?.dispose();
     _videoPlayerController = null;
     _videoController = null;
     _instance = null;

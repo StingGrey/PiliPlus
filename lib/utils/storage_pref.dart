@@ -768,7 +768,7 @@ abstract final class Pref {
       _setting.get(SettingBoxKey.fullScreenGestureReverse, defaultValue: false);
 
   static bool get autoPiP =>
-      _setting.get(SettingBoxKey.autoPiP, defaultValue: false);
+      _setting.get(SettingBoxKey.autoPiP, defaultValue: Platform.isIOS);
 
   static bool get enableSponsorBlock =>
       _setting.get(SettingBoxKey.enableSponsorBlock, defaultValue: false);

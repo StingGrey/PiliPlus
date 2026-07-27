@@ -3,6 +3,7 @@ import 'package:PiliPlus/common/style.dart';
 import 'package:PiliPlus/models/common/image_type.dart';
 import 'package:PiliPlus/utils/extension/num_ext.dart';
 import 'package:PiliPlus/utils/image_utils.dart';
+import 'package:PiliPlus/utils/platform_utils.dart';
 import 'package:PiliPlus/utils/storage_pref.dart';
 import 'package:cached_network_image_ce/cached_network_image.dart';
 import 'package:flutter/material.dart';
@@ -64,6 +65,7 @@ class NetworkImgLayer extends StatelessWidget {
     required bool isEmote,
     required bool isAvatar,
   }) {
+    final optimizeForIPad = PlatformUtils.isIPad(context);
     int? memCacheWidth, memCacheHeight;
     if (cacheWidth ?? width <= height) {
       memCacheWidth = width.cacheSize(context);
@@ -71,15 +73,23 @@ class NetworkImgLayer extends StatelessWidget {
       memCacheHeight = height.cacheSize(context);
     }
     return CachedNetworkImage(
-      imageUrl: ImageUtils.thumbnailUrl(src, quality),
+      imageUrl: optimizeForIPad
+          ? ImageUtils.thumbnailUrlForSize(
+              src,
+              maxQuality: quality,
+              targetWidth: memCacheWidth,
+              targetHeight: memCacheHeight,
+            )
+          : ImageUtils.thumbnailUrl(src, quality),
       width: width,
       height: height,
       memCacheWidth: memCacheWidth,
       memCacheHeight: memCacheHeight,
       fit: fit,
       alignment: alignment,
-      fadeOutDuration: fadeOutDuration,
-      fadeInDuration: fadeInDuration,
+      // iPad 同屏图片较多，批量透明度动画会增加合成负担。
+      fadeOutDuration: optimizeForIPad ? Duration.zero : fadeOutDuration,
+      fadeInDuration: optimizeForIPad ? Duration.zero : fadeInDuration,
       filterQuality: FilterQuality.low,
       placeholder: (_, _) =>
           getPlaceHolder?.call() ??

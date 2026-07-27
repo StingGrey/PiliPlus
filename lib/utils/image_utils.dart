@@ -247,6 +247,53 @@ abstract final class ImageUtils {
     return src.http2https;
   }
 
+  /// 为列表图片请求接近实际解码尺寸的 CDN 缩略图，避免先下载、再解码原图。
+  /// 已带 CDN 处理参数的地址保持原行为，防止覆盖调用方指定的裁剪规则。
+  static String thumbnailUrlForSize(
+    String? src, {
+    int maxQuality = 1,
+    int? targetWidth,
+    int? targetHeight,
+  }) {
+    if (src == null ||
+        maxQuality == 100 ||
+        (targetWidth == null && targetHeight == null)) {
+      return thumbnailUrl(src, maxQuality);
+    }
+
+    final uri = Uri.tryParse(src);
+    final host = uri?.host.toLowerCase();
+    final supportsBiliResize =
+        host != null &&
+        (host == 'hdslb.com' ||
+            host.endsWith('.hdslb.com') ||
+            host == 'biliimg.com' ||
+            host.endsWith('.biliimg.com'));
+    final pathSegments = uri?.pathSegments;
+    final lastSegment = pathSegments?.isNotEmpty == true ? pathSegments!.last : null;
+    if (!supportsBiliResize ||
+        lastSegment?.isNotEmpty != true ||
+        lastSegment!.contains('@')) {
+      return thumbnailUrl(src, maxQuality);
+    }
+
+    maxQuality = math.max(maxQuality, GlobalData().imgQuality);
+    final resize = targetWidth != null
+        ? '${targetWidth}w'
+        : '${targetHeight}h';
+    final queryStart = src.indexOf('?');
+    final fragmentStart = src.indexOf('#');
+    final suffixStart = queryStart == -1
+        ? (fragmentStart == -1 ? src.length : fragmentStart)
+        : (fragmentStart == -1 || queryStart < fragmentStart
+              ? queryStart
+              : fragmentStart);
+    final resized =
+        '${src.substring(0, suffixStart)}@${resize}_${maxQuality}q.webp'
+        '${src.substring(suffixStart)}';
+    return resized.http2https;
+  }
+
   static Future<SaveResult?> saveByteImg({
     required Uint8List bytes,
     required String fileName,

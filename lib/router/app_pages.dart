@@ -1,3 +1,5 @@
+import 'dart:io' show Platform;
+
 import 'package:PiliPlus/pages/article/view.dart';
 import 'package:PiliPlus/pages/article_list/view.dart';
 import 'package:PiliPlus/pages/audio/view.dart';
@@ -91,8 +93,16 @@ class Routes {
     GetPage(name: '/later', page: () => const LaterPage()),
     // 历史记录
     GetPage(name: '/history', page: () => const HistoryPage()),
-    // 搜索页面
-    GetPage(name: '/search', page: () => const SearchPage()),
+    // 搜索页面：iOS 强制使用系统风格的可逆转场，避免从首页进入时无动画。
+    if (Platform.isIOS)
+      GetPage(
+        name: '/search',
+        page: () => const SearchPage(),
+        transition: Transition.cupertino,
+        transitionDuration: const Duration(milliseconds: 360),
+      )
+    else
+      GetPage(name: '/search', page: () => const SearchPage()),
     // 搜索结果
     GetPage(name: '/searchResult', page: () => const SearchResultPage()),
     // 动态

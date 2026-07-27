@@ -214,6 +214,7 @@ class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
   static ColorScheme? _light, _dark;
+  static bool _didTuneIPadImageCache = false;
 
   static void _onBack() {
     if (SmartDialog.checkExist()) {
@@ -296,6 +297,14 @@ class MyApp extends StatelessWidget {
   static Widget _builder(BuildContext context, Widget? child) {
     final uiScale = Pref.uiScale;
     final mediaQuery = MediaQuery.of(context);
+    if (!_didTuneIPadImageCache && PlatformUtils.isIPad(context)) {
+      final imageCache = PaintingBinding.instance.imageCache;
+      // iPad 一屏会显示更多卡片，适当扩大缓存可避免回滚时反复解码。
+      imageCache
+        ..maximumSize = 1200
+        ..maximumSizeBytes = 128 << 20;
+      _didTuneIPadImageCache = true;
+    }
     final textScaler = TextScaler.linear(Pref.defaultTextScale);
     if (uiScale != 1.0) {
       child = MediaQuery(
