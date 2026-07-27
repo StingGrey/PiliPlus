@@ -8,6 +8,7 @@ import 'package:PiliPlus/pages/search_panel/pgc/view.dart';
 import 'package:PiliPlus/pages/search_panel/user/view.dart';
 import 'package:PiliPlus/pages/search_panel/video/view.dart';
 import 'package:PiliPlus/pages/search_result/controller.dart';
+import 'package:PiliPlus/router/search_navigation.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
@@ -79,8 +80,8 @@ class _SearchResultPageState extends State<SearchResultPage>
             if (_isFromSearch) {
               Get.back();
             } else {
-              Get.offNamed(
-                '/search',
+              SearchNavigation.open(
+                replace: true,
                 parameters: {'text': _searchResultController.keyword},
               );
             }

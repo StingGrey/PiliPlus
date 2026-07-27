@@ -26,13 +26,6 @@ jobs:
           channel: stable
           flutter-version-file: pubspec.yaml
 
-      - name: Resolve dependencies
-        run: flutter pub get
-
-      - name: Patch media-kit iOS PiP
-        shell: pwsh
-        run: lib/scripts/patch_media_kit_ios.ps1
-
       - name: Set and Extract version
         shell: pwsh
         run: lib/scripts/build.ps1
@@ -40,6 +33,13 @@ jobs:
       - name: Apply Patch
         shell: pwsh
         run: lib/scripts/patch.ps1 iOS
+
+      - name: Resolve dependencies
+        run: flutter pub get
+
+      - name: Patch media-kit iOS PiP
+        shell: pwsh
+        run: lib/scripts/patch_media_kit_ios.ps1
 
       - name: Build iOS
         run: |

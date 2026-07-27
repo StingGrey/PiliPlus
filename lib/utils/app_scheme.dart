@@ -19,6 +19,7 @@ import 'package:PiliPlus/pages/subscription_detail/view.dart';
 import 'package:PiliPlus/pages/video/reply_reply/view.dart';
 import 'package:PiliPlus/utils/id_utils.dart';
 import 'package:PiliPlus/utils/page_utils.dart';
+import 'package:PiliPlus/router/search_navigation.dart';
 import 'package:PiliPlus/utils/request_utils.dart';
 import 'package:PiliPlus/utils/url_utils.dart';
 import 'package:PiliPlus/utils/utils.dart';
@@ -207,7 +208,7 @@ abstract final class PiliScheme {
               );
               return true;
             }
-            Get.toNamed('/search');
+            SearchNavigation.open();
             return true;
           case 'article':
             // bilibili://article/40679479?jump_opus=1&jump_opus_type=1&opus_type=article&h5awaken=random

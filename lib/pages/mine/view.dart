@@ -12,6 +12,7 @@ import 'package:PiliPlus/pages/common/common_page.dart';
 import 'package:PiliPlus/pages/home/view.dart';
 import 'package:PiliPlus/pages/login/controller.dart';
 import 'package:PiliPlus/pages/main/controller.dart';
+import 'package:PiliPlus/router/search_navigation.dart';
 import 'package:PiliPlus/pages/mine/controller.dart';
 import 'package:PiliPlus/pages/mine/widgets/item.dart';
 import 'package:PiliPlus/utils/bili_utils.dart';
@@ -159,7 +160,7 @@ class _MediaPageState extends CommonPageState<MinePage>
             padding: padding,
             style: style,
             tooltip: '搜索',
-            onPressed: () => Get.toNamed('/search'),
+            onPressed: () => SearchNavigation.open(),
             icon: const Icon(Icons.search),
           ),
           msgBadge(_mainController),

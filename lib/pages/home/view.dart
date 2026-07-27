@@ -4,6 +4,7 @@ import 'package:PiliPlus/common/widgets/image/network_img_layer.dart';
 import 'package:PiliPlus/common/widgets/scroll_physics.dart';
 import 'package:PiliPlus/pages/common/common_page.dart';
 import 'package:PiliPlus/pages/home/controller.dart';
+import 'package:PiliPlus/router/search_navigation.dart';
 import 'package:PiliPlus/pages/main/controller.dart';
 import 'package:PiliPlus/pages/mine/controller.dart';
 import 'package:PiliPlus/utils/extension/get_ext.dart';
@@ -151,8 +152,7 @@ class _HomePageState extends CommonPageState<HomePage>
             splashColor: theme.colorScheme.primaryContainer.withValues(
               alpha: 0.3,
             ),
-            onTap: () => Get.toNamed(
-              '/search',
+            onTap: () => SearchNavigation.open(
               parameters: _homeController.enableSearchWord
                   ? {'hintText': _homeController.defaultSearch.value}
                   : null,
