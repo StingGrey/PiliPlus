@@ -44,6 +44,7 @@ $EditableTextPatch = "lib/scripts/editable_text.patch"
 $TextFieldPatch = "lib/scripts/text_field.patch"
 
 $ScrollPositionPatch = "lib/scripts/scroll_position.patch"
+$ScrollPositionIOSPatch = "lib/scripts/scroll_position_ios.patch"
 
 $SelectionPlaceholderPatch = "lib/scripts/selection_placeholder.patch"
 
@@ -79,8 +80,17 @@ $reverts = @()
 $patches = @($ModalBarrierPatch, $TextSelectionPatch, $MouseCursorPatch,
             $ImageAnimPatch, $LayoutBuilderPatch, $NavigationDrawerPatch,
             $PopupMenuPatch, $FABPatch, $SelectableRegionPatch, $SelectableRegionSelectionPatch,
-            $EditableTextPatch, $TextFieldPatch, $ScrollPositionPatch,
+            $EditableTextPatch, $TextFieldPatch,
             $SelectionPlaceholderPatch)
+
+# The upstream FAB patch intentionally skips the first pixel update of every
+# drag on iOS. Keep that behavior on existing platforms, but use the iOS
+# variant that always moves content 1:1 with the finger.
+if ($platform.ToLower() -eq "ios") {
+    $patches += $ScrollPositionIOSPatch
+} else {
+    $patches += $ScrollPositionPatch
+}
 
 switch ($platform.ToLower()) {
     "android" {

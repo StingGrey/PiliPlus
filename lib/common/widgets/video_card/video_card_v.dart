@@ -82,6 +82,7 @@ class VideoCardV extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final optimizeForIPad = PlatformUtils.isIPad(context);
     void onLongPress() => imageSaveDialog(
       title: videoItem.title,
       cover: videoItem.cover,
@@ -91,8 +92,14 @@ class VideoCardV extends StatelessWidget {
       clipBehavior: Clip.none,
       children: [
         Card(
-          clipBehavior: Clip.hardEdge,
+          // 推荐页 iPad 同屏卡片较多，关闭阴影层可降低滚动时的合成开销。
+          elevation: optimizeForIPad ? 0 : null,
+          shadowColor: optimizeForIPad ? Colors.transparent : null,
+          // On iPad only the cover needs clipping. Clipping the complete card
+          // makes every title/stat row participate in the moving clip layer.
+          clipBehavior: optimizeForIPad ? Clip.none : Clip.hardEdge,
           child: InkWell(
+            borderRadius: optimizeForIPad ? Style.mdRadius : null,
             onTap: onPushDetail,
             onLongPress: onLongPress,
             onSecondaryTap: PlatformUtils.isMobile ? null : onLongPress,
@@ -112,7 +119,12 @@ class VideoCardV extends StatelessWidget {
                             src: videoItem.cover,
                             width: maxWidth,
                             height: maxHeight,
-                            type: .emote,
+                            type: optimizeForIPad ? .def : .emote,
+                            borderRadius: optimizeForIPad
+                                ? const BorderRadius.vertical(
+                                    top: Style.imgRadius,
+                                  )
+                                : Style.mdRadius,
                           ),
                           if (videoItem.duration > 0)
                             PBadge(
