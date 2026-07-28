@@ -1,4 +1,7 @@
+import 'dart:async';
 import 'dart:io';
+import 'dart:math' as math;
+import 'dart:ui' show FontFeature, FramePhase, FrameTiming;
 
 import 'package:PiliPlus/build_config.dart';
 import 'package:PiliPlus/common/constants.dart';
@@ -49,6 +52,11 @@ import 'package:window_manager/window_manager.dart' hide calcWindowPosition;
 WebViewEnvironment? webViewEnvironment;
 
 EdgeInsets? tmpPadding;
+
+const bool _performanceHudEnabled = bool.fromEnvironment(
+  'PILI_PERF_HUD',
+  defaultValue: false,
+);
 
 Future<void> _initDownPath() async {
   if (PlatformUtils.isDesktop) {
@@ -319,6 +327,9 @@ class MyApp extends StatelessWidget {
         child: child!,
       );
     }
+    if (Platform.isIOS && _performanceHudEnabled) {
+      child = _PerformanceHud(child: child);
+    }
     if (PlatformUtils.isDesktop) {
       return BackDetector(
         onBack: _onBack,
@@ -371,6 +382,147 @@ class MyApp extends StatelessWidget {
     }
     GStorage.setting.put(SettingBoxKey.dynamicColor, false);
     return false;
+  }
+}
+
+class _PerformanceHud extends StatefulWidget {
+  const _PerformanceHud({required this.child});
+
+  final Widget child;
+
+  @override
+  State<_PerformanceHud> createState() => _PerformanceHudState();
+}
+
+class _PerformanceHudState extends State<_PerformanceHud> {
+  static const int _maxSamples = 240;
+
+  final List<double> _frameIntervals = [];
+  final List<double> _buildTimes = [];
+  final List<double> _rasterTimes = [];
+  Timer? _refreshTimer;
+  int? _lastVsyncMicros;
+  String _summary = '正在采集帧时…';
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addTimingsCallback(_onTimings);
+    _refreshTimer = Timer.periodic(
+      const Duration(seconds: 1),
+      (_) => _refreshSummary(),
+    );
+  }
+
+  @override
+  void dispose() {
+    _refreshTimer?.cancel();
+    WidgetsBinding.instance.removeTimingsCallback(_onTimings);
+    super.dispose();
+  }
+
+  void _onTimings(List<FrameTiming> timings) {
+    for (final timing in timings) {
+      final vsyncMicros = timing.timestampInMicroseconds(FramePhase.vsyncStart);
+      final lastVsyncMicros = _lastVsyncMicros;
+      if (lastVsyncMicros != null) {
+        final interval = (vsyncMicros - lastVsyncMicros) / 1000;
+        if (interval >= 4 && interval <= 50) {
+          _frameIntervals.add(interval);
+        }
+      }
+      _lastVsyncMicros = vsyncMicros;
+      _buildTimes.add(timing.buildDuration.inMicroseconds / 1000);
+      _rasterTimes.add(timing.rasterDuration.inMicroseconds / 1000);
+    }
+    _trim(_frameIntervals);
+    _trim(_buildTimes);
+    _trim(_rasterTimes);
+  }
+
+  void _trim(List<double> values) {
+    if (values.length > _maxSamples) {
+      values.removeRange(0, values.length - _maxSamples);
+    }
+  }
+
+  double _percentile(List<double> values, double percentile) {
+    final sorted = [...values]..sort();
+    final index = ((sorted.length - 1) * percentile).round();
+    return sorted[index];
+  }
+
+  void _refreshSummary() {
+    if (!mounted ||
+        _frameIntervals.isEmpty ||
+        _buildTimes.isEmpty ||
+        _rasterTimes.isEmpty) {
+      return;
+    }
+
+    final frameInterval = _percentile(_frameIntervals, 0.5);
+    final baseInterval = _percentile(_frameIntervals, 0.2);
+    final observedFps = 1000 / frameInterval;
+    final refreshRate = 1000 / baseInterval;
+    final sampleCount = math.min(_buildTimes.length, _rasterTimes.length);
+    var overBudget = 0;
+    for (var i = 0; i < sampleCount; i++) {
+      if (math.max(_buildTimes[i], _rasterTimes[i]) > baseInterval * 1.05) {
+        overBudget++;
+      }
+    }
+    final overBudgetPercent = sampleCount == 0
+        ? 0.0
+        : overBudget * 100 / sampleCount;
+    final summary =
+        '刷新 ${refreshRate.round()}Hz  实际 ${observedFps.round()}fps\n'
+        'UI P95 ${_percentile(_buildTimes, 0.95).toStringAsFixed(1)}ms  '
+        'GPU P95 ${_percentile(_rasterTimes, 0.95).toStringAsFixed(1)}ms\n'
+        '超预算 ${overBudgetPercent.toStringAsFixed(0)}%';
+    if (summary != _summary) {
+      setState(() => _summary = summary);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        widget.child,
+        IgnorePointer(
+          child: SafeArea(
+            minimum: const EdgeInsets.all(8),
+            child: Align(
+              alignment: Alignment.topRight,
+              child: RepaintBoundary(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.76),
+                    borderRadius: BorderRadius.circular(9),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 9,
+                      vertical: 7,
+                    ),
+                    child: Text(
+                      _summary,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 11,
+                        height: 1.25,
+                        fontFeatures: [FontFeature.tabularFigures()],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
   }
 }
 

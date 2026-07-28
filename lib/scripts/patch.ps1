@@ -77,15 +77,17 @@ Set-Location $env:FLUTTER_ROOT
 $picks   = @($TextSelectionMenuFix)
 $reverts = @()
 $patches = @($ModalBarrierPatch, $TextSelectionPatch, $MouseCursorPatch,
-            $ImageAnimPatch, $LayoutBuilderPatch, $NavigationDrawerPatch,
+            $ImageAnimPatch, $NavigationDrawerPatch,
             $PopupMenuPatch, $FABPatch, $SelectableRegionPatch, $SelectableRegionSelectionPatch,
             $EditableTextPatch, $TextFieldPatch,
             $SelectionPlaceholderPatch)
 
-# Keep the app-specific scroll patch on existing platforms. iOS uses Flutter's
-# tested implementation directly; patching applyUserOffset is too risky for the
-# gesture hot path and can disturb scroll notification ordering.
+# Keep Flutter's native layout and scroll scheduling on iOS. These framework
+# patches affect every scrolling list and LayoutBuilder in the app, so even a
+# small regression is visible at 120 Hz. Other platforms retain the existing
+# behavior until they can be tested separately.
 if ($platform.ToLower() -ne "ios") {
+    $patches += $LayoutBuilderPatch
     $patches += $ScrollPositionPatch
 }
 
@@ -96,7 +98,6 @@ switch ($platform.ToLower()) {
         $patches += $NavigatorPatch
     }
     "ios" {
-        $patches += $ScrollViewPatch
         $patches += $BottomSheetIOSFlutterPatch
         $patches += $NavigatorPatch
     }
