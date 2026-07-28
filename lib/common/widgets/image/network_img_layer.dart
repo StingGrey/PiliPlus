@@ -3,6 +3,7 @@ import 'package:PiliPlus/common/style.dart';
 import 'package:PiliPlus/models/common/image_type.dart';
 import 'package:PiliPlus/utils/extension/num_ext.dart';
 import 'package:PiliPlus/utils/image_utils.dart';
+import 'package:PiliPlus/utils/performance_probe.dart';
 import 'package:PiliPlus/utils/storage_pref.dart';
 import 'package:cached_network_image_ce/cached_network_image.dart';
 import 'package:flutter/material.dart';
@@ -22,6 +23,7 @@ class NetworkImgLayer extends StatelessWidget {
     this.fit = .cover,
     this.alignment = .center,
     this.cacheWidth,
+    this.memoryOnly = false,
   });
 
   final String? src;
@@ -36,6 +38,7 @@ class NetworkImgLayer extends StatelessWidget {
   final BoxFit fit;
   final Alignment alignment;
   final bool? cacheWidth;
+  final bool memoryOnly;
 
   static Color? reduceLuxColor = Pref.reduceLuxColor;
   static bool reduce = false;
@@ -64,14 +67,41 @@ class NetworkImgLayer extends StatelessWidget {
     required bool isEmote,
     required bool isAvatar,
   }) {
+    PerformanceProbe.recordImageBuild();
     int? memCacheWidth, memCacheHeight;
     if (cacheWidth ?? width <= height) {
       memCacheWidth = width.cacheSize(context);
     } else {
       memCacheHeight = height.cacheSize(context);
     }
+    final imageUrl = ImageUtils.thumbnailUrl(src, quality);
+    if (memoryOnly) {
+      return Image.network(
+        imageUrl,
+        width: width,
+        height: height,
+        cacheWidth: memCacheWidth,
+        cacheHeight: memCacheHeight,
+        fit: fit,
+        alignment: alignment,
+        filterQuality: FilterQuality.low,
+        frameBuilder: (context, child, frame, wasSynchronouslyLoaded) =>
+            wasSynchronouslyLoaded || frame != null
+            ? child
+            : getPlaceHolder?.call() ??
+                  _placeholder(
+                    context,
+                    isEmote: isEmote,
+                    isAvatar: isAvatar,
+                  ),
+        errorBuilder: (context, error, stackTrace) =>
+            _placeholder(context, isEmote: isEmote, isAvatar: isAvatar),
+        colorBlendMode: reduce ? BlendMode.modulate : null,
+        color: reduce ? reduceLuxColor : null,
+      );
+    }
     return CachedNetworkImage(
-      imageUrl: ImageUtils.thumbnailUrl(src, quality),
+      imageUrl: imageUrl,
       width: width,
       height: height,
       memCacheWidth: memCacheWidth,

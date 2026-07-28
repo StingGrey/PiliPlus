@@ -25,6 +25,7 @@ import 'package:PiliPlus/utils/extension/theme_ext.dart';
 import 'package:PiliPlus/utils/json_file_handler.dart';
 import 'package:PiliPlus/utils/max_screen_size.dart';
 import 'package:PiliPlus/utils/path_utils.dart';
+import 'package:PiliPlus/utils/performance_probe.dart';
 import 'package:PiliPlus/utils/platform_utils.dart';
 import 'package:PiliPlus/utils/request_utils.dart';
 import 'package:PiliPlus/utils/storage.dart';
@@ -52,11 +53,6 @@ import 'package:window_manager/window_manager.dart' hide calcWindowPosition;
 WebViewEnvironment? webViewEnvironment;
 
 EdgeInsets? tmpPadding;
-
-const bool _performanceHudEnabled = bool.fromEnvironment(
-  'PILI_PERF_HUD',
-  defaultValue: false,
-);
 
 Future<void> _initDownPath() async {
   if (PlatformUtils.isDesktop) {
@@ -327,7 +323,7 @@ class MyApp extends StatelessWidget {
         child: child!,
       );
     }
-    if (Platform.isIOS && _performanceHudEnabled) {
+    if (Platform.isIOS && performanceHudEnabled) {
       child = _PerformanceHud(child: child);
     }
     if (PlatformUtils.isDesktop) {
@@ -403,6 +399,7 @@ class _PerformanceHudState extends State<_PerformanceHud> {
   Timer? _refreshTimer;
   int? _lastVsyncMicros;
   String _summary = '正在采集帧时…';
+  ({int cards, int images}) _buildCounts = (cards: 0, images: 0);
 
   @override
   void initState() {
@@ -453,6 +450,7 @@ class _PerformanceHudState extends State<_PerformanceHud> {
   }
 
   void _refreshSummary() {
+    _buildCounts = PerformanceProbe.takeBuildCounts();
     if (!mounted ||
         _frameIntervals.isEmpty ||
         _buildTimes.isEmpty ||
@@ -475,13 +473,24 @@ class _PerformanceHudState extends State<_PerformanceHud> {
         ? 0.0
         : overBudget * 100 / sampleCount;
     final summary =
+        '模式 ${PerformanceProbe.rcmdRenderMode.value.label}（点按切换）\n'
         '刷新 ${refreshRate.round()}Hz  实际 ${observedFps.round()}fps\n'
         'UI P95 ${_percentile(_buildTimes, 0.95).toStringAsFixed(1)}ms  '
         'GPU P95 ${_percentile(_rasterTimes, 0.95).toStringAsFixed(1)}ms\n'
-        '超预算 ${overBudgetPercent.toStringAsFixed(0)}%';
+        '超预算 ${overBudgetPercent.toStringAsFixed(0)}%  '
+        '新卡 ${_buildCounts.cards}/s 图 ${_buildCounts.images}/s';
     if (summary != _summary) {
       setState(() => _summary = summary);
     }
+  }
+
+  void _cycleMode() {
+    final next = PerformanceProbe.cycleRcmdRenderMode();
+    _frameIntervals.clear();
+    _buildTimes.clear();
+    _rasterTimes.clear();
+    _lastVsyncMicros = null;
+    setState(() => _summary = '模式 ${next.label}\n正在重新采集帧时…');
   }
 
   @override
@@ -490,12 +499,14 @@ class _PerformanceHudState extends State<_PerformanceHud> {
       fit: StackFit.expand,
       children: [
         widget.child,
-        IgnorePointer(
-          child: SafeArea(
-            minimum: const EdgeInsets.all(8),
-            child: Align(
-              alignment: Alignment.topRight,
-              child: RepaintBoundary(
+        SafeArea(
+          minimum: const EdgeInsets.all(8),
+          child: Align(
+            alignment: Alignment.topRight,
+            child: RepaintBoundary(
+              child: GestureDetector(
+                onTap: _cycleMode,
+                behavior: HitTestBehavior.opaque,
                 child: DecoratedBox(
                   decoration: BoxDecoration(
                     color: Colors.black.withValues(alpha: 0.76),

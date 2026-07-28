@@ -15,6 +15,7 @@ import 'package:PiliPlus/utils/duration_utils.dart';
 import 'package:PiliPlus/utils/extension/dimension_ext.dart';
 import 'package:PiliPlus/utils/id_utils.dart';
 import 'package:PiliPlus/utils/page_utils.dart';
+import 'package:PiliPlus/utils/performance_probe.dart';
 import 'package:PiliPlus/utils/platform_utils.dart';
 import 'package:PiliPlus/utils/storage_pref.dart';
 import 'package:flutter/material.dart';
@@ -25,11 +26,13 @@ import 'package:intl/intl.dart';
 class VideoCardV extends StatelessWidget {
   final BaseRcmdVideoItemModel videoItem;
   final VoidCallback? onRemove;
+  final RcmdRenderMode renderMode;
 
   const VideoCardV({
     super.key,
     required this.videoItem,
     this.onRemove,
+    this.renderMode = RcmdRenderMode.diskCachedImage,
   });
 
   Future<void> onPushDetail() async {
@@ -83,11 +86,15 @@ class VideoCardV extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    PerformanceProbe.recordCardBuild();
     void onLongPress() => imageSaveDialog(
       title: videoItem.title,
       cover: videoItem.cover,
       bvid: videoItem.bvid,
     );
+    if (renderMode == RcmdRenderMode.lightweight) {
+      return _lightweightCard(context, onLongPress);
+    }
     return Stack(
       clipBehavior: Clip.none,
       children: [
@@ -100,31 +107,7 @@ class VideoCardV extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                AspectRatio(
-                  aspectRatio: Style.aspectRatio,
-                  child: Stack(
-                    fit: StackFit.expand,
-                    clipBehavior: Clip.none,
-                    children: [
-                      NetworkImgLayer(
-                        src: videoItem.cover,
-                        width: Pref.recommendCardWidth,
-                        height: Pref.recommendCardWidth / Style.aspectRatio,
-                        type: .emote,
-                      ),
-                      if (videoItem.duration > 0)
-                        PBadge(
-                          bottom: 6,
-                          right: 7,
-                          size: .small,
-                          type: .gray,
-                          text: DurationUtils.formatDuration(
-                            videoItem.duration,
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
+                _cover(context),
                 content(context),
               ],
             ),
@@ -143,6 +126,71 @@ class VideoCardV extends StatelessWidget {
             ),
           ),
       ],
+    );
+  }
+
+  Widget _cover(BuildContext context) {
+    final showImage = renderMode != RcmdRenderMode.noImage;
+    return AspectRatio(
+      aspectRatio: Style.aspectRatio,
+      child: Stack(
+        fit: StackFit.expand,
+        clipBehavior: Clip.none,
+        children: [
+          if (showImage)
+            NetworkImgLayer(
+              src: videoItem.cover,
+              width: Pref.recommendCardWidth,
+              height: Pref.recommendCardWidth / Style.aspectRatio,
+              type: .emote,
+              memoryOnly:
+                  renderMode == RcmdRenderMode.memoryImage ||
+                  renderMode == RcmdRenderMode.lightweight,
+            )
+          else
+            ColoredBox(
+              color: ColorScheme.of(
+                context,
+              ).onInverseSurface.withValues(alpha: 0.4),
+            ),
+          if (videoItem.duration > 0)
+            PBadge(
+              bottom: 6,
+              right: 7,
+              size: .small,
+              type: .gray,
+              text: DurationUtils.formatDuration(videoItem.duration),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _lightweightCard(BuildContext context, VoidCallback onLongPress) {
+    return Card(
+      clipBehavior: Clip.hardEdge,
+      child: InkWell(
+        onTap: onPushDetail,
+        onLongPress: onLongPress,
+        onSecondaryTap: PlatformUtils.isMobile ? null : onLongPress,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _cover(context),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(6, 5, 6, 5),
+                child: Text(
+                  '${videoItem.title}\n',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(height: 1.38),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
