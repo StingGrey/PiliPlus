@@ -916,7 +916,10 @@ Future<void> _showBarHideTypeDialog(
     builder: (context) => SelectDialog<BarHideType>(
       title: '顶/底栏收起类型',
       value: Pref.barHideType,
-      values: BarHideType.values.map((e) => (e, e.label)).toList(),
+      values: BarHideType.values
+          .where((e) => !Platform.isIOS || e != BarHideType.sync)
+          .map((e) => (e, e.label))
+          .toList(),
     ),
   );
   if (res != null) {

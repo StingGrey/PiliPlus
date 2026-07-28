@@ -120,10 +120,10 @@ class _HomePageState extends CommonPageState<HomePage>
           final showSearchBar = showTopBar.value;
           return AnimatedOpacity(
             opacity: showSearchBar ? 1 : 0,
-            duration: const Duration(milliseconds: 300),
+            duration: const Duration(milliseconds: 120),
             child: AnimatedContainer(
-              curve: Curves.easeInOutCubicEmphasized,
-              duration: const Duration(milliseconds: 500),
+              curve: Curves.easeOutCubic,
+              duration: const Duration(milliseconds: 220),
               height: showSearchBar ? Style.topBarHeight : 0,
               padding: padding,
               child: child,

@@ -59,6 +59,7 @@ class _PgcPageState extends State<PgcPage> with AutomaticKeepAliveClientMixin {
       onRefresh: controller.onRefresh,
       child: CustomScrollView(
         controller: controller.scrollController,
+        cacheExtent: scrollPreloadExtent(context),
         physics: const AlwaysScrollableScrollPhysics(),
         slivers: [
           _buildFollow(theme),

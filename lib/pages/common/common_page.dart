@@ -55,11 +55,15 @@ abstract class CommonPageState<T extends StatefulWidget> extends State<T> {
   }
 
   void _updateOffset(double scrollDelta) {
-    _barOffset!.value = clampDouble(
-      _barOffset!.value + scrollDelta,
+    final oldValue = _barOffset!.value;
+    final newValue = clampDouble(
+      oldValue + scrollDelta,
       0.0,
       Style.topBarHeight,
     );
+    if (newValue != oldValue) {
+      _barOffset!.value = newValue;
+    }
   }
 
   bool onNotificationType2(ScrollNotification notification) {

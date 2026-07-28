@@ -701,7 +701,7 @@ abstract final class Pref {
   static BarHideType get barHideType =>
       BarHideType.values[_setting.get(
         SettingBoxKey.barHideType,
-        defaultValue: BarHideType.sync.index,
+        defaultValue: BarHideType.instant.index,
       )];
 
   static bool get enableSearchWord =>
