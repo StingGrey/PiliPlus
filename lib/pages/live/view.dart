@@ -6,7 +6,6 @@ import 'package:PiliPlus/common/widgets/flutter/refresh_indicator.dart';
 import 'package:PiliPlus/common/widgets/image/network_img_layer.dart';
 import 'package:PiliPlus/common/widgets/loading_widget/http_error.dart';
 import 'package:PiliPlus/common/widgets/pair.dart';
-import 'package:PiliPlus/common/widgets/scroll_physics.dart';
 import 'package:PiliPlus/http/loading_state.dart';
 import 'package:PiliPlus/models_new/live/live_feed_index/card_data_list_item.dart';
 import 'package:PiliPlus/models_new/live/live_feed_index/card_list.dart';
@@ -58,7 +57,6 @@ class _LivePageState extends State<LivePage>
         onRefresh: controller.onRefresh,
         child: CustomScrollView(
           controller: controller.scrollController,
-          cacheExtent: scrollPreloadExtent(context),
           physics: const AlwaysScrollableScrollPhysics(),
           slivers: [
             SliverPadding(

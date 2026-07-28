@@ -4,11 +4,6 @@ import 'package:PiliPlus/utils/platform_utils.dart';
 import 'package:PiliPlus/utils/storage_pref.dart';
 import 'package:flutter/material.dart' hide TabBarView;
 
-/// Builds enough content ahead of the viewport to move image decode/upload
-/// away from the frame in which a card first becomes visible.
-double scrollPreloadExtent(BuildContext context) =>
-    MediaQuery.sizeOf(context).height * 0.75;
-
 Widget tabBarView({
   required List<Widget> children,
   TabController? controller,

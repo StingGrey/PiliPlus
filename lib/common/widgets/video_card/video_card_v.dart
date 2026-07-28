@@ -16,6 +16,7 @@ import 'package:PiliPlus/utils/extension/dimension_ext.dart';
 import 'package:PiliPlus/utils/id_utils.dart';
 import 'package:PiliPlus/utils/page_utils.dart';
 import 'package:PiliPlus/utils/platform_utils.dart';
+import 'package:PiliPlus/utils/storage_pref.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:intl/intl.dart';
@@ -101,32 +102,27 @@ class VideoCardV extends StatelessWidget {
               children: [
                 AspectRatio(
                   aspectRatio: Style.aspectRatio,
-                  child: LayoutBuilder(
-                    builder: (context, boxConstraints) {
-                      double maxWidth = boxConstraints.maxWidth;
-                      double maxHeight = boxConstraints.maxHeight;
-                      return Stack(
-                        clipBehavior: Clip.none,
-                        children: [
-                          NetworkImgLayer(
-                            src: videoItem.cover,
-                            width: maxWidth,
-                            height: maxHeight,
-                            type: .emote,
+                  child: Stack(
+                    fit: StackFit.expand,
+                    clipBehavior: Clip.none,
+                    children: [
+                      NetworkImgLayer(
+                        src: videoItem.cover,
+                        width: Pref.recommendCardWidth,
+                        height: Pref.recommendCardWidth / Style.aspectRatio,
+                        type: .emote,
+                      ),
+                      if (videoItem.duration > 0)
+                        PBadge(
+                          bottom: 6,
+                          right: 7,
+                          size: .small,
+                          type: .gray,
+                          text: DurationUtils.formatDuration(
+                            videoItem.duration,
                           ),
-                          if (videoItem.duration > 0)
-                            PBadge(
-                              bottom: 6,
-                              right: 7,
-                              size: .small,
-                              type: .gray,
-                              text: DurationUtils.formatDuration(
-                                videoItem.duration,
-                              ),
-                            ),
-                        ],
-                      );
-                    },
+                        ),
+                    ],
                   ),
                 ),
                 content(context),
