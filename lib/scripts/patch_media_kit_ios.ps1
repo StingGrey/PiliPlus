@@ -174,14 +174,15 @@ Replace-Exact -Path $pluginFile -OldText @'
     case "PictureInPicture.Prepare":
       let args = call.arguments as? [String: Any]
       let handle = Int64(args?["handle"] as? String ?? "")
-      guard let handle else {
+      let isLive = args?["isLive"] as? Bool
+      guard let handle, let isLive else {
         return result(FlutterError(
-          code: "invalid_handle",
-          message: "PictureInPicture.Prepare requires a valid handle.",
+          code: "invalid_arguments",
+          message: "PictureInPicture.Prepare requires handle and isLive.",
           details: nil
         ))
       }
-      result(pictureInPictureManager.prepare(handle: handle))
+      result(pictureInPictureManager.prepare(handle: handle, isLive: isLive))
     case "PictureInPicture.SetPlaying":
       let args = call.arguments as? [String: Any]
       let handle = Int64(args?["handle"] as? String ?? "")
@@ -194,6 +195,26 @@ Replace-Exact -Path $pluginFile -OldText @'
         ))
       }
       pictureInPictureManager.setPlaying(handle: handle, playing: playing)
+      result(nil)
+    case "PictureInPicture.UpdatePlaybackState":
+      let args = call.arguments as? [String: Any]
+      let handle = Int64(args?["handle"] as? String ?? "")
+      let isLive = args?["isLive"] as? Bool
+      let duration = (args?["duration"] as? NSNumber)?.doubleValue
+      let position = (args?["position"] as? NSNumber)?.doubleValue
+      guard let handle, let isLive, let duration, let position else {
+        return result(FlutterError(
+          code: "invalid_arguments",
+          message: "PictureInPicture.UpdatePlaybackState requires handle, isLive, duration and position.",
+          details: nil
+        ))
+      }
+      pictureInPictureManager.updatePlaybackState(
+        handle: handle,
+        isLive: isLive,
+        duration: duration / 1000,
+        position: position / 1000
+      )
       result(nil)
     case "PictureInPicture.Dispose":
       let args = call.arguments as? [String: Any]

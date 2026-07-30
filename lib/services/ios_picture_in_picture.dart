@@ -25,25 +25,58 @@ final class IOSPictureInPictureService {
   Player? _player;
   int? _handle;
 
-  Future<bool> attach(Player player) async {
+  Future<bool> attach(Player player, {required bool isLive}) async {
     if (!Platform.isIOS) return false;
-    if (_handle == player.handle) return true;
+    if (_handle == player.handle) {
+      _player = player;
+      await updatePlaybackState(
+        isLive: isLive,
+        duration: player.state.duration,
+        position: player.state.position,
+      );
+      return true;
+    }
 
     try {
       final prepared =
           await _channel.invokeMethod<bool>('PictureInPicture.Prepare', {
             'handle': player.handle.toString(),
+            'isLive': isLive,
           }) ??
           false;
       if (!prepared) return false;
       _player = player;
       _handle = player.handle;
+      await updatePlaybackState(
+        isLive: isLive,
+        duration: player.state.duration,
+        position: player.state.position,
+      );
       return true;
     } catch (error) {
       // PiP is an optional enhancement: a channel/OS failure must never stop
       // the normal iOS player from being created.
       debugPrint('iOS PiP prepare failed: $error');
       return false;
+    }
+  }
+
+  Future<void> updatePlaybackState({
+    required bool isLive,
+    required Duration duration,
+    required Duration position,
+  }) async {
+    final handle = _handle;
+    if (!Platform.isIOS || handle == null) return;
+    try {
+      await _channel.invokeMethod<void>('PictureInPicture.UpdatePlaybackState', {
+        'handle': handle.toString(),
+        'isLive': isLive,
+        'duration': duration.inMilliseconds,
+        'position': position.inMilliseconds,
+      });
+    } catch (error) {
+      debugPrint('iOS PiP playback state update failed: $error');
     }
   }
 
@@ -86,6 +119,17 @@ final class IOSPictureInPictureService {
         } else {
           await player.pause();
         }
+      case 'PictureInPicture.SkipByInterval':
+        final args = Map<Object?, Object?>.from(call.arguments as Map);
+        final seconds = (args['seconds'] as num?)?.toDouble();
+        if (seconds == null || !seconds.isFinite) return;
+        final current = player.state.position;
+        final duration = player.state.duration;
+        var target =
+            current + Duration(milliseconds: (seconds * 1000).round());
+        if (target < Duration.zero) target = Duration.zero;
+        if (duration > Duration.zero && target > duration) target = duration;
+        await player.seek(target);
       case 'PictureInPicture.Error':
         debugPrint('iOS PiP: ${call.arguments}');
     }

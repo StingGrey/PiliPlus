@@ -654,6 +654,16 @@ class PlPlayerController with BlockConfigMixin {
       updateDuration(duration ?? _videoPlayerController!.state.duration);
       position.value = buffered.value = seekTo?.inSeconds ?? 0;
 
+      if (Platform.isIOS && autoPiP) {
+        unawaited(
+          IOSPictureInPictureService.instance.updatePlaybackState(
+            isLive: isLive,
+            duration: Duration(milliseconds: durationInMilliseconds),
+            position: seekTo ?? Duration.zero,
+          ),
+        );
+      }
+
       dataStatus.value = .loaded;
 
       if (autoFullScreenFlag && autoEnterFullScreen) {
@@ -761,7 +771,7 @@ class PlPlayerController with BlockConfigMixin {
     );
 
     if (Platform.isIOS && autoPiP) {
-      await IOSPictureInPictureService.instance.attach(player);
+      await IOSPictureInPictureService.instance.attach(player, isLive: isLive);
     }
 
     player.setMediaHeader(userAgent: BrowserUa.pc, referer: HttpString.baseUrl);
@@ -981,6 +991,16 @@ class PlPlayerController with BlockConfigMixin {
 
           videoPlayerServiceHandler?.onPositionChange(position);
 
+          if (Platform.isIOS && autoPiP) {
+            unawaited(
+              IOSPictureInPictureService.instance.updatePlaybackState(
+                isLive: isLive,
+                duration: videoPlayerController!.state.duration,
+                position: position,
+              ),
+            );
+          }
+
           makeHeartBeat(posInSeconds);
         }
 
@@ -988,7 +1008,18 @@ class PlPlayerController with BlockConfigMixin {
           element(position);
         }
       }),
-      stream.duration.listen(updateDuration),
+      stream.duration.listen((Duration duration) {
+        updateDuration(duration);
+        if (Platform.isIOS && autoPiP) {
+          unawaited(
+            IOSPictureInPictureService.instance.updatePlaybackState(
+              isLive: isLive,
+              duration: duration,
+              position: videoPlayerController!.state.position,
+            ),
+          );
+        }
+      }),
       stream.buffer.listen((Duration buffer) {
         buffered.value = buffer.inSeconds;
       }),

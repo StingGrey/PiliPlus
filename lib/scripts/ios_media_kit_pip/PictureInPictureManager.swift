@@ -6,7 +6,13 @@ import QuartzCore
 import UIKit
 
 private protocol PictureInPictureManaging: AnyObject {
-  func prepare(handle: Int64) -> Bool
+  func prepare(handle: Int64, isLive: Bool) -> Bool
+  func updatePlaybackState(
+    handle: Int64,
+    isLive: Bool,
+    duration: TimeInterval,
+    position: TimeInterval
+  )
   func setPlaying(handle: Int64, playing: Bool)
   func needsFrame(handle: Int64) -> Bool
   func consumeFrame(handle: Int64, pixelBuffer: CVPixelBuffer, size: CGSize)
@@ -24,7 +30,7 @@ public final class PictureInPictureManager: NSObject {
     super.init()
   }
 
-  public func prepare(handle: Int64) -> Bool {
+  public func prepare(handle: Int64, isLive: Bool) -> Bool {
     guard #available(iOS 15.0, *),
           AVPictureInPictureController.isPictureInPictureSupported()
     else {
@@ -34,7 +40,22 @@ public final class PictureInPictureManager: NSObject {
     if implementation == nil {
       implementation = PictureInPictureManagerIOS15(channel: channel)
     }
-    return implementation!.prepare(handle: handle)
+    return implementation!.prepare(handle: handle, isLive: isLive)
+  }
+
+  public func updatePlaybackState(
+    handle: Int64,
+    isLive: Bool,
+    duration: TimeInterval,
+    position: TimeInterval
+  ) {
+    guard #available(iOS 15.0, *) else { return }
+    implementation?.updatePlaybackState(
+      handle: handle,
+      isLive: isLive,
+      duration: duration,
+      position: position
+    )
   }
 
   public func setPlaying(handle: Int64, playing: Bool) {
@@ -78,8 +99,11 @@ private final class PictureInPictureManagerIOS15: NSObject,
   private let displayLayer = AVSampleBufferDisplayLayer()
 
   private var controller: AVPictureInPictureController?
+  private var timebase: CMTimebase?
   private var activeHandle: Int64?
   private var isPlaying = false
+  private var isLive = false
+  private var duration: TimeInterval = 0
   private var isPictureInPictureActive = false
   private var lastFrameTime: CFTimeInterval = 0
   private var formatDescription: CMVideoFormatDescription?
@@ -89,7 +113,7 @@ private final class PictureInPictureManagerIOS15: NSObject,
     super.init()
   }
 
-  func prepare(handle: Int64) -> Bool {
+  func prepare(handle: Int64, isLive: Bool) -> Bool {
     dispatchPrecondition(condition: .onQueue(.main))
 
     if activeHandle == handle, controller != nil {
@@ -122,6 +146,21 @@ private final class PictureInPictureManagerIOS15: NSObject,
       sourceView.layer.addSublayer(displayLayer)
     }
 
+    var timebase: CMTimebase?
+    let timebaseStatus = CMTimebaseCreateWithSourceClock(
+      allocator: kCFAllocatorDefault,
+      sourceClock: CMClockGetHostTimeClock(),
+      timebaseOut: &timebase
+    )
+    if timebaseStatus == noErr, let timebase {
+      CMTimebaseSetTime(timebase, time: .zero)
+      CMTimebaseSetRate(timebase, rate: 0)
+      displayLayer.controlTimebase = timebase
+      self.timebase = timebase
+    } else {
+      sendError("创建 PiP 时间基准失败：\(timebaseStatus)")
+    }
+
     let contentSource = AVPictureInPictureController.ContentSource(
       sampleBufferDisplayLayer: displayLayer,
       playbackDelegate: self
@@ -129,17 +168,50 @@ private final class PictureInPictureManagerIOS15: NSObject,
     let controller = AVPictureInPictureController(contentSource: contentSource)
     controller.delegate = self
     controller.canStartPictureInPictureAutomaticallyFromInline = true
-    controller.requiresLinearPlayback = true
+    controller.requiresLinearPlayback = isLive
 
     stateLock.lock()
     activeHandle = handle
     isPlaying = false
+    self.isLive = isLive
+    duration = 0
     isPictureInPictureActive = false
     lastFrameTime = 0
     stateLock.unlock()
 
     self.controller = controller
     return true
+  }
+
+  func updatePlaybackState(
+    handle: Int64,
+    isLive: Bool,
+    duration: TimeInterval,
+    position: TimeInterval
+  ) {
+    stateLock.lock()
+    guard activeHandle == handle else {
+      stateLock.unlock()
+      return
+    }
+    self.isLive = isLive
+    self.duration = max(0, duration)
+    let safePosition = max(0, min(position, duration > 0 ? duration : position))
+    let playing = isPlaying
+    stateLock.unlock()
+
+    DispatchQueue.main.async { [weak self] in
+      guard let self, self.isCurrentHandle(handle) else { return }
+      self.controller?.requiresLinearPlayback = isLive
+      if let timebase = self.timebase {
+        CMTimebaseSetTime(
+          timebase,
+          time: CMTime(seconds: safePosition, preferredTimescale: 1000)
+        )
+        CMTimebaseSetRate(timebase, rate: playing ? 1 : 0)
+      }
+      self.controller?.invalidatePlaybackState()
+    }
   }
 
   func setPlaying(handle: Int64, playing: Bool) {
@@ -152,7 +224,11 @@ private final class PictureInPictureManagerIOS15: NSObject,
     stateLock.unlock()
 
     DispatchQueue.main.async { [weak self] in
-      self?.controller?.invalidatePlaybackState()
+      guard let self else { return }
+      if let timebase = self.timebase {
+        CMTimebaseSetRate(timebase, rate: playing ? 1 : 0)
+      }
+      self.controller?.invalidatePlaybackState()
     }
   }
 
@@ -257,13 +333,17 @@ private final class PictureInPictureManagerIOS15: NSObject,
     controller?.delegate = nil
     controller = nil
     displayLayer.flushAndRemoveImage()
+    displayLayer.controlTimebase = nil
     displayLayer.removeFromSuperlayer()
     sourceView.removeFromSuperview()
     formatDescription = nil
+    timebase = nil
 
     stateLock.lock()
     activeHandle = nil
     isPlaying = false
+    isLive = false
+    duration = 0
     isPictureInPictureActive = false
     lastFrameTime = 0
     stateLock.unlock()
@@ -306,7 +386,22 @@ private final class PictureInPictureManagerIOS15: NSObject,
   func pictureInPictureControllerTimeRangeForPlayback(
     _: AVPictureInPictureController
   ) -> CMTimeRange {
-    return CMTimeRange(start: .zero, duration: .positiveInfinity)
+    stateLock.lock()
+    let isLive = self.isLive
+    let duration = self.duration
+    stateLock.unlock()
+
+    if isLive {
+      return CMTimeRange(start: .zero, duration: .positiveInfinity)
+    }
+
+    // Keep the range finite even before media-kit reports metadata; otherwise
+    // iOS labels ordinary on-demand videos as live streams.
+    let finiteDuration = duration > 0 ? duration : 3600
+    return CMTimeRange(
+      start: .zero,
+      duration: CMTime(seconds: finiteDuration, preferredTimescale: 1000)
+    )
   }
 
   func pictureInPictureControllerIsPlaybackPaused(
@@ -324,9 +419,16 @@ private final class PictureInPictureManagerIOS15: NSObject,
 
   func pictureInPictureController(
     _: AVPictureInPictureController,
-    skipByInterval _: CMTime,
+    skipByInterval interval: CMTime,
     completion completionHandler: @escaping () -> Void
   ) {
+    let seconds = CMTimeGetSeconds(interval)
+    if seconds.isFinite {
+      channel.invokeMethod(
+        "PictureInPicture.SkipByInterval",
+        arguments: ["seconds": seconds]
+      )
+    }
     completionHandler()
   }
 
