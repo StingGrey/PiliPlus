@@ -162,12 +162,18 @@ abstract final class ThemeUtils {
     final colorScheme = themeData.colorScheme;
     final color = colorScheme.surfaceContainerHighest.darken(0.7);
     return themeData.copyWith(
+      // `ThemeData.copyWith(colorScheme: ...)` does not recompute canvasColor.
+      // Material widgets without an explicit color would otherwise keep the
+      // original dark surface instead of using OLED black.
+      canvasColor: Colors.black,
       scaffoldBackgroundColor: Colors.black,
       appBarTheme: themeData.appBarTheme.copyWith(
         backgroundColor: Colors.black,
       ),
       cardTheme: themeData.cardTheme.copyWith(
         color: Colors.black,
+        // Prevent Material elevation tint from turning black cards grey.
+        surfaceTintColor: Colors.transparent,
       ),
       dialogTheme: themeData.dialogTheme.copyWith(
         backgroundColor: color,
@@ -196,15 +202,17 @@ abstract final class ThemeUtils {
         onSecondaryContainer: colorScheme.onSecondaryContainer.darken(0.1),
         error: colorScheme.error.darken(0.1),
         surface: Colors.black,
+        surfaceDim: Colors.black,
+        surfaceBright: Colors.black,
+        surfaceContainerLowest: Colors.black,
+        surfaceContainerLow: Colors.black,
         onSurface: colorScheme.onSurface.darken(0.15),
-        surfaceTint: colorScheme.surfaceTint.darken(),
+        surfaceTint: Colors.transparent,
         inverseSurface: colorScheme.inverseSurface.darken(),
         onInverseSurface: colorScheme.onInverseSurface.darken(),
-        surfaceContainer: colorScheme.surfaceContainer.darken(),
-        surfaceContainerHigh: colorScheme.surfaceContainerHigh.darken(),
-        surfaceContainerHighest: colorScheme.surfaceContainerHighest.darken(
-          0.4,
-        ),
+        surfaceContainer: Colors.black,
+        surfaceContainerHigh: Colors.black,
+        surfaceContainerHighest: Colors.black,
       ),
     );
   }
