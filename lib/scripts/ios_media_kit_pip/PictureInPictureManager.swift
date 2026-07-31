@@ -153,7 +153,6 @@ private final class PictureInPictureManagerIOS15: NSObject,
     window.insertSubview(sourceView, at: 0)
 
     displayLayer.frame = sourceView.bounds
-    displayLayer.autoresizingMask = [.layerWidthSizable, .layerHeightSizable]
     displayLayer.videoGravity = .resizeAspect
     if displayLayer.superlayer == nil {
       sourceView.layer.addSublayer(displayLayer)
