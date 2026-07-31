@@ -4,8 +4,10 @@ import 'package:PiliPlus/common/widgets/flutter/refresh_indicator.dart';
 import 'package:PiliPlus/common/widgets/loading_widget/http_error.dart';
 import 'package:PiliPlus/common/widgets/video_card/video_card_v.dart';
 import 'package:PiliPlus/http/loading_state.dart';
+import 'package:PiliPlus/models/model_rec_video_item.dart';
 import 'package:PiliPlus/pages/rcmd/controller.dart';
 import 'package:PiliPlus/utils/grid.dart';
+import 'package:PiliPlus/utils/performance_probe.dart';
 import 'package:PiliPlus/utils/storage_pref.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -66,9 +68,11 @@ class _RcmdPageState extends State<RcmdPage>
       Loading() => _buildSkeleton,
       Success(:final response) =>
         response != null && response.isNotEmpty
-            ? SliverGrid.builder(
-                gridDelegate: gridDelegate,
-                itemBuilder: (context, index) {
+            ? ValueListenableBuilder<RcmdRenderMode>(
+                valueListenable: PerformanceProbe.rcmdRenderMode,
+                builder: (context, renderMode, _) => SliverGrid.builder(
+                  gridDelegate: gridDelegate,
+                  itemBuilder: (context, index) {
                   if (index == response.length - 1) {
                     controller.onLoadMore();
                   }
@@ -96,8 +100,14 @@ class _RcmdPageState extends State<RcmdPage>
                     final actualIndex = index > controller.lastRefreshAt!
                         ? index - 1
                         : index;
-                    return VideoCardV(
-                      videoItem: response[actualIndex],
+                    final videoItem =
+                        response[actualIndex] as BaseRcmdVideoItemModel;
+                    return _CachedVideoCard(
+                      key: ValueKey(
+                        '${_videoCardKey(videoItem)}:$actualIndex',
+                      ),
+                      videoItem: videoItem,
+                      renderMode: renderMode,
                       onRemove: () {
                         if (controller.lastRefreshAt != null &&
                             actualIndex < controller.lastRefreshAt!) {
@@ -110,17 +120,23 @@ class _RcmdPageState extends State<RcmdPage>
                       },
                     );
                   } else {
-                    return VideoCardV(
-                      videoItem: response[index],
+                    final videoItem =
+                        response[index] as BaseRcmdVideoItemModel;
+                    return _CachedVideoCard(
+                      key: ValueKey('${_videoCardKey(videoItem)}:$index'),
+                      videoItem: videoItem,
+                      renderMode: renderMode,
                       onRemove: () => controller.loadingState
                         ..value.data!.removeAt(index)
                         ..refresh(),
                     );
                   }
-                },
-                itemCount: controller.lastRefreshAt != null
-                    ? response.length + 1
-                    : response.length,
+                  },
+                  itemCount: controller.lastRefreshAt != null
+                      ? response.length + 1
+                      : response.length,
+                  addAutomaticKeepAlives: false,
+                ),
               )
             : HttpError(onReload: controller.onReload),
       Error(:final errMsg) => HttpError(
@@ -134,5 +150,53 @@ class _RcmdPageState extends State<RcmdPage>
     gridDelegate: gridDelegate,
     itemBuilder: (context, index) => const VideoCardVSkeleton(),
     itemCount: 10,
+    addAutomaticKeepAlives: false,
   );
+}
+
+String _videoCardKey(BaseRcmdVideoItemModel item) =>
+    '${item.goto}:${item.bvid ?? item.param ?? item.aid ?? item.uri}';
+
+class _CachedVideoCard extends StatefulWidget {
+  const _CachedVideoCard({
+    super.key,
+    required this.videoItem,
+    required this.renderMode,
+    required this.onRemove,
+  });
+
+  final BaseRcmdVideoItemModel videoItem;
+  final RcmdRenderMode renderMode;
+  final VoidCallback onRemove;
+
+  @override
+  State<_CachedVideoCard> createState() => _CachedVideoCardState();
+}
+
+class _CachedVideoCardState extends State<_CachedVideoCard> {
+  late Widget _card;
+
+  @override
+  void initState() {
+    super.initState();
+    _card = _buildCard();
+  }
+
+  Widget _buildCard() => VideoCardV(
+    videoItem: widget.videoItem,
+    renderMode: widget.renderMode,
+    onRemove: () => widget.onRemove(),
+  );
+
+  @override
+  void didUpdateWidget(covariant _CachedVideoCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.videoItem, widget.videoItem) ||
+        oldWidget.renderMode != widget.renderMode) {
+      _card = _buildCard();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => _card;
 }

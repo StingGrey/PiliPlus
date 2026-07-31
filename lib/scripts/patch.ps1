@@ -6,6 +6,7 @@ param(
 # https://github.com/flutter/flutter/issues/182281
 $NewOverScrollIndicator = "362b1de29974ffc1ed6faa826e1df870d7bec75f";
 
+# set `gestureSettings`
 $BottomSheetAndroidPatch = "lib/scripts/bottom_sheet_android.patch"
 
 # https://github.com/bggRGjQaUbCoE/PiliPlus/issues/1906
@@ -17,9 +18,11 @@ $BottomSheetIOSPiliPlusPatch = "lib/scripts/bottom_sheet_ios_piliplus.patch"
 $TextSelectionMenuFix = "beb2ad17004a1b118ff2bd09f55cee23198f6652";
 
 # https://github.com/bggRGjQaUbCoE/PiliPlus/issues/1662
+# handle bottom scroll event
 $ScrollViewPatch = "lib/scripts/scroll_view.patch"
 
 # https://github.com/bggRGjQaUbCoE/PiliPlus/issues/2106
+# use `TouchGestureRecognizer` on all platforms
 $TextSelectionPatch = "lib/scripts/text_selection.patch"
 
 # https://github.com/bggRGjQaUbCoE/PiliPlus/issues/1947
@@ -28,28 +31,48 @@ $NavigatorPatch = "lib/scripts/navigator.patch"
 # https://github.com/bggRGjQaUbCoE/PiliPlus/issues/2107
 $ImageAnimPatch = "lib/scripts/image_anim.patch"
 
+# remove `_scheduleRebuild`
 $LayoutBuilderPatch = "lib/scripts/layout_builder.patch"
 
 # https://github.com/bggRGjQaUbCoE/PiliPlus/issues/2308
 $NavigationDrawerPatch = "lib/scripts/navigation_drawer.patch"
 
+# apply text color to icon color
 $PopupMenuPatch = "lib/scripts/popup_menu.patch"
 
+# remove `Hero` effect
 $FABPatch = "lib/scripts/fab.patch"
 
-$SelectableRegionSelectionPatch = "lib/scripts/selectable_region.patch"
+# https://github.com/flutter/flutter/issues/139890
+# https://github.com/flutter/flutter/issues/174689
+# separator support
+# clamp handle offset
+# widgetspan selection support
+# clear selection when tapping outside
+# free selection if there is only one text
+# clamp dragging selection behavior on Android
+# show selection menu if secondary tap position is in text region on desktop
+$SelectableRegionPatch = "lib/scripts/selectable_region.patch"
 
+# https://github.com/flutter/flutter/issues/132047
+# https://github.com/flutter/flutter/issues/174689
 $EditableTextPatch = "lib/scripts/editable_text.patch"
 
+# set `selectAllOnFocus` to `false` by default
 $TextFieldPatch = "lib/scripts/text_field.patch"
 
+# notify `userScrollDirection` only if position is actually changing
 $ScrollPositionPatch = "lib/scripts/scroll_position.patch"
 
-$SelectionPlaceholderPatch = "lib/scripts/selection_placeholder.patch"
+# expose `_shouldIgnorePointer`
+$ScrollablePatch = "lib/scripts/scrollable.patch"
+
+$TabsPatch = "lib/scripts/tabs.patch"
 
 # TODO: remove
+# https://github.com/flutter/flutter/issues/124078
 # https://github.com/flutter/flutter/pull/183261
-$SelectableRegionPatch = "lib/scripts/null_safety_for_selectable_region.patch"
+$NullSafetySelectableRegionPatch = "lib/scripts/null_safety_for_selectable_region.patch"
 
 # TODO: remove
 # https://github.com/flutter/flutter/issues/90223
@@ -77,15 +100,17 @@ Set-Location $env:FLUTTER_ROOT
 $picks   = @($TextSelectionMenuFix)
 $reverts = @()
 $patches = @($ModalBarrierPatch, $TextSelectionPatch, $MouseCursorPatch,
-            $ImageAnimPatch, $LayoutBuilderPatch, $NavigationDrawerPatch,
-            $PopupMenuPatch, $FABPatch, $SelectableRegionPatch, $SelectableRegionSelectionPatch,
-            $EditableTextPatch, $TextFieldPatch,
-            $SelectionPlaceholderPatch)
+            $ImageAnimPatch, $NavigationDrawerPatch,
+            $PopupMenuPatch, $FABPatch, $NullSafetySelectableRegionPatch,
+            $SelectableRegionPatch, $EditableTextPatch, $TextFieldPatch,
+            $ScrollablePatch, $TabsPatch)
 
-# Keep the app-specific scroll patch on existing platforms. iOS uses Flutter's
-# tested implementation directly; patching applyUserOffset is too risky for the
-# gesture hot path and can disturb scroll notification ordering.
+# Keep Flutter's native layout and scroll scheduling on iOS. These framework
+# patches affect every scrolling list and LayoutBuilder in the app, so even a
+# small regression is visible at 120 Hz. Other platforms retain the existing
+# behavior until they can be tested separately.
 if ($platform.ToLower() -ne "ios") {
+    $patches += $LayoutBuilderPatch
     $patches += $ScrollPositionPatch
 }
 
@@ -96,7 +121,6 @@ switch ($platform.ToLower()) {
         $patches += $NavigatorPatch
     }
     "ios" {
-        $patches += $ScrollViewPatch
         $patches += $BottomSheetIOSFlutterPatch
         $patches += $NavigatorPatch
     }

@@ -1,9 +1,11 @@
 import 'dart:async';
+import 'dart:io' show Platform;
 
 import 'package:PiliPlus/common/widgets/view_safe_area.dart';
 import 'package:PiliPlus/grpc/dyn.dart';
 import 'package:PiliPlus/http/loading_state.dart';
 import 'package:PiliPlus/http/msg.dart';
+import 'package:PiliPlus/models/common/bar_hide_type.dart';
 import 'package:PiliPlus/models/common/dynamic/dynamic_badge_mode.dart';
 import 'package:PiliPlus/models/common/msg/msg_unread_type.dart';
 import 'package:PiliPlus/models/common/nav_bar_config.dart';
@@ -33,7 +35,7 @@ class MainController extends GetxController
   RxDouble? barOffset;
   RxBool? showBottomBar;
   late final bool hideBottomBar;
-  late final barHideType = Pref.barHideType;
+  late final BarHideType barHideType;
   bool useBottomNav = false;
   late dynamic controller;
   final RxInt selectedIndex = 0.obs;
@@ -72,6 +74,21 @@ class MainController extends GetxController
   @override
   void onInit() {
     super.onInit();
+    final configuredBarHideType = Pref.barHideType;
+    // Scroll-linked layout and position correction can miss the 120 Hz frame
+    // budget on iOS, so migrate that platform to the event-driven mode.
+    if (Platform.isIOS && configuredBarHideType == BarHideType.sync) {
+      barHideType = BarHideType.instant;
+      unawaited(
+        GStorage.setting.put(
+          SettingBoxKey.barHideType,
+          BarHideType.instant.index,
+        ),
+      );
+    } else {
+      barHideType = configuredBarHideType;
+    }
+
     if (Pref.autoUpdate) {
       Update.checkUpdate();
     }
