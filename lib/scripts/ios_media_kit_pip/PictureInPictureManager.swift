@@ -93,8 +93,18 @@ private final class PictureInPictureManagerIOS15: NSObject,
   AVPictureInPictureControllerDelegate,
   AVPictureInPictureSampleBufferPlaybackDelegate
 {
+  private struct PendingFrame {
+    let handle: Int64
+    let pixelBuffer: CVPixelBuffer
+  }
+
   private let channel: FlutterMethodChannel
   private let stateLock = NSLock()
+  private let frameLock = NSLock()
+  private let frameQueue = DispatchQueue(
+    label: "com.piliplus.ios_picture_in_picture.frames",
+    qos: .userInteractive
+  )
   private let sourceView = UIView(frame: .zero)
   private let displayLayer = AVSampleBufferDisplayLayer()
 
@@ -105,7 +115,9 @@ private final class PictureInPictureManagerIOS15: NSObject,
   private var isLive = false
   private var duration: TimeInterval = 0
   private var isPictureInPictureActive = false
-  private var lastFrameTime: CFTimeInterval = 0
+  private var hasPrimingFrame = false
+  private var pendingFrame: PendingFrame?
+  private var frameDrainScheduled = false
   private var formatDescription: CMVideoFormatDescription?
 
   init(channel: FlutterMethodChannel) {
@@ -141,6 +153,7 @@ private final class PictureInPictureManagerIOS15: NSObject,
     window.insertSubview(sourceView, at: 0)
 
     displayLayer.frame = sourceView.bounds
+    displayLayer.autoresizingMask = [.layerWidthSizable, .layerHeightSizable]
     displayLayer.videoGravity = .resizeAspect
     if displayLayer.superlayer == nil {
       sourceView.layer.addSublayer(displayLayer)
@@ -176,7 +189,7 @@ private final class PictureInPictureManagerIOS15: NSObject,
     self.isLive = isLive
     duration = 0
     isPictureInPictureActive = false
-    lastFrameTime = 0
+    hasPrimingFrame = false
     stateLock.unlock()
 
     self.controller = controller
@@ -220,11 +233,18 @@ private final class PictureInPictureManagerIOS15: NSObject,
       stateLock.unlock()
       return
     }
+    if playing, !isPlaying, !isPictureInPictureActive {
+      hasPrimingFrame = false
+    }
     isPlaying = playing
     stateLock.unlock()
 
+    if !playing {
+      clearPendingFrame()
+    }
+
     DispatchQueue.main.async { [weak self] in
-      guard let self else { return }
+      guard let self, self.isCurrentHandle(handle) else { return }
       if let timebase = self.timebase {
         CMTimebaseSetRate(timebase, rate: playing ? 1 : 0)
       }
@@ -237,11 +257,10 @@ private final class PictureInPictureManagerIOS15: NSObject,
     defer { stateLock.unlock() }
 
     guard activeHandle == handle, isPlaying else { return false }
-    let now = CACurrentMediaTime()
-    let minimumInterval = isPictureInPictureActive ? (1.0 / 30.0) : (1.0 / 12.0)
-    guard now - lastFrameTime >= minimumInterval else { return false }
-    lastFrameTime = now
-    return true
+
+    // Do not impose an artificial frame-rate cap while PiP is active. Before
+    // PiP starts, one frame is enough to prime AVSampleBufferDisplayLayer.
+    return isPictureInPictureActive || !hasPrimingFrame
   }
 
   func consumeFrame(
@@ -249,73 +268,26 @@ private final class PictureInPictureManagerIOS15: NSObject,
     pixelBuffer: CVPixelBuffer,
     size _: CGSize
   ) {
-    DispatchQueue.main.async { [weak self] in
-      guard let self, self.isCurrentHandle(handle) else { return }
+    stateLock.lock()
+    guard activeHandle == handle else {
+      stateLock.unlock()
+      return
+    }
+    stateLock.unlock()
 
-      if self.displayLayer.status == .failed {
-        self.displayLayer.flush()
+    var shouldScheduleDrain = false
+    frameLock.lock()
+    pendingFrame = PendingFrame(handle: handle, pixelBuffer: pixelBuffer)
+    if !frameDrainScheduled {
+      frameDrainScheduled = true
+      shouldScheduleDrain = true
+    }
+    frameLock.unlock()
+
+    if shouldScheduleDrain {
+      frameQueue.async { [weak self] in
+        self?.drainPendingFrames()
       }
-      self.displayLayer.frame = self.sourceView.bounds
-
-      let description: CMVideoFormatDescription
-      if let cached = self.formatDescription,
-         CMVideoFormatDescriptionMatchesImageBuffer(
-           cached,
-           imageBuffer: pixelBuffer
-         )
-      {
-        description = cached
-      } else {
-        var created: CMVideoFormatDescription?
-        let status = CMVideoFormatDescriptionCreateForImageBuffer(
-          allocator: kCFAllocatorDefault,
-          imageBuffer: pixelBuffer,
-          formatDescriptionOut: &created
-        )
-        guard status == noErr, let created else {
-          self.sendError("创建 PiP 视频格式失败：\(status)")
-          return
-        }
-        self.formatDescription = created
-        description = created
-      }
-
-      var timing = CMSampleTimingInfo(
-        duration: .invalid,
-        presentationTimeStamp: CMClockGetTime(CMClockGetHostTimeClock()),
-        decodeTimeStamp: .invalid
-      )
-      var sampleBuffer: CMSampleBuffer?
-      let status = CMSampleBufferCreateReadyWithImageBuffer(
-        allocator: kCFAllocatorDefault,
-        imageBuffer: pixelBuffer,
-        formatDescription: description,
-        sampleTiming: &timing,
-        sampleBufferOut: &sampleBuffer
-      )
-      guard status == noErr, let sampleBuffer else {
-        self.sendError("创建 PiP 视频帧失败：\(status)")
-        return
-      }
-
-      if let attachments = CMSampleBufferGetSampleAttachmentsArray(
-        sampleBuffer,
-        createIfNecessary: true
-      ), CFArrayGetCount(attachments) > 0 {
-        let dictionary = unsafeBitCast(
-          CFArrayGetValueAtIndex(attachments, 0),
-          to: CFMutableDictionary.self
-        )
-        CFDictionarySetValue(
-          dictionary,
-          Unmanaged.passUnretained(
-            kCMSampleAttachmentKey_DisplayImmediately
-          ).toOpaque(),
-          Unmanaged.passUnretained(kCFBooleanTrue).toOpaque()
-        )
-      }
-
-      self.displayLayer.enqueue(sampleBuffer)
     }
   }
 
@@ -327,25 +299,171 @@ private final class PictureInPictureManagerIOS15: NSObject,
   }
 
   private func disposeCurrentController() {
-    if controller?.isPictureInPictureActive == true {
-      controller?.stopPictureInPicture()
-    }
-    controller?.delegate = nil
-    controller = nil
-    displayLayer.flushAndRemoveImage()
-    displayLayer.controlTimebase = nil
-    displayLayer.removeFromSuperlayer()
-    sourceView.removeFromSuperview()
-    formatDescription = nil
-    timebase = nil
-
     stateLock.lock()
     activeHandle = nil
     isPlaying = false
     isLive = false
     duration = 0
     isPictureInPictureActive = false
-    lastFrameTime = 0
+    hasPrimingFrame = false
+    stateLock.unlock()
+
+    if controller?.isPictureInPictureActive == true {
+      controller?.stopPictureInPicture()
+    }
+    controller?.delegate = nil
+    controller = nil
+
+    frameQueue.sync {
+      frameLock.lock()
+      pendingFrame = nil
+      frameDrainScheduled = false
+      frameLock.unlock()
+      formatDescription = nil
+      displayLayer.flushAndRemoveImage()
+    }
+
+    displayLayer.controlTimebase = nil
+    displayLayer.removeFromSuperlayer()
+    sourceView.removeFromSuperview()
+    timebase = nil
+  }
+
+  private func clearPendingFrame() {
+    frameLock.lock()
+    pendingFrame = nil
+    frameLock.unlock()
+  }
+
+  private func drainPendingFrames() {
+    guard displayLayer.isReadyForMoreMediaData else {
+      finishFrameDrain()
+      return
+    }
+
+    frameLock.lock()
+    guard let frame = pendingFrame else {
+      frameDrainScheduled = false
+      frameLock.unlock()
+      return
+    }
+    pendingFrame = nil
+    frameLock.unlock()
+
+    if isCurrentHandle(frame.handle) {
+      autoreleasepool {
+        if displayLayer.status == .failed {
+          displayLayer.flush()
+          formatDescription = nil
+        }
+        if let sampleBuffer = makeSampleBuffer(
+          pixelBuffer: frame.pixelBuffer
+        ) {
+          displayLayer.enqueue(sampleBuffer)
+          markPrimingFrameEnqueued(handle: frame.handle)
+        }
+      }
+    }
+
+    finishFrameDrain()
+  }
+
+  private func finishFrameDrain() {
+    frameLock.lock()
+    frameDrainScheduled = false
+    let shouldRetry = pendingFrame != nil
+    frameLock.unlock()
+
+    // The next decoded frame normally retries the drain. Handle the narrow
+    // race where the display layer became ready while the drain was stopping.
+    if shouldRetry, displayLayer.isReadyForMoreMediaData {
+      scheduleFrameDrain()
+    }
+  }
+
+  private func scheduleFrameDrain() {
+    frameLock.lock()
+    guard pendingFrame != nil, !frameDrainScheduled else {
+      frameLock.unlock()
+      return
+    }
+    frameDrainScheduled = true
+    frameLock.unlock()
+
+    frameQueue.async { [weak self] in
+      self?.drainPendingFrames()
+    }
+  }
+
+  private func makeSampleBuffer(
+    pixelBuffer: CVPixelBuffer
+  ) -> CMSampleBuffer? {
+    let description: CMVideoFormatDescription
+    if let cached = formatDescription,
+       CMVideoFormatDescriptionMatchesImageBuffer(
+         cached,
+         imageBuffer: pixelBuffer
+       )
+    {
+      description = cached
+    } else {
+      var created: CMVideoFormatDescription?
+      let status = CMVideoFormatDescriptionCreateForImageBuffer(
+        allocator: kCFAllocatorDefault,
+        imageBuffer: pixelBuffer,
+        formatDescriptionOut: &created
+      )
+      guard status == noErr, let created else {
+        sendError("创建 PiP 视频格式失败：\(status)")
+        return nil
+      }
+      formatDescription = created
+      description = created
+    }
+
+    var timing = CMSampleTimingInfo(
+      duration: .invalid,
+      presentationTimeStamp: CMClockGetTime(CMClockGetHostTimeClock()),
+      decodeTimeStamp: .invalid
+    )
+    var sampleBuffer: CMSampleBuffer?
+    let status = CMSampleBufferCreateReadyWithImageBuffer(
+      allocator: kCFAllocatorDefault,
+      imageBuffer: pixelBuffer,
+      formatDescription: description,
+      sampleTiming: &timing,
+      sampleBufferOut: &sampleBuffer
+    )
+    guard status == noErr, let sampleBuffer else {
+      sendError("创建 PiP 视频帧失败：\(status)")
+      return nil
+    }
+
+    if let attachments = CMSampleBufferGetSampleAttachmentsArray(
+      sampleBuffer,
+      createIfNecessary: true
+    ), CFArrayGetCount(attachments) > 0 {
+      let dictionary = unsafeBitCast(
+        CFArrayGetValueAtIndex(attachments, 0),
+        to: CFMutableDictionary.self
+      )
+      CFDictionarySetValue(
+        dictionary,
+        Unmanaged.passUnretained(
+          kCMSampleAttachmentKey_DisplayImmediately
+        ).toOpaque(),
+        Unmanaged.passUnretained(kCFBooleanTrue).toOpaque()
+      )
+    }
+
+    return sampleBuffer
+  }
+
+  private func markPrimingFrameEnqueued(handle: Int64) {
+    stateLock.lock()
+    if activeHandle == handle, !isPictureInPictureActive {
+      hasPrimingFrame = true
+    }
     stateLock.unlock()
   }
 
@@ -356,10 +474,12 @@ private final class PictureInPictureManagerIOS15: NSObject,
   }
 
   private func sendError(_ message: String) {
-    channel.invokeMethod(
-      "PictureInPicture.Error",
-      arguments: ["message": message]
-    )
+    DispatchQueue.main.async { [weak self] in
+      self?.channel.invokeMethod(
+        "PictureInPicture.Error",
+        arguments: ["message": message]
+      )
+    }
   }
 
   private static func activeWindow() -> UIWindow? {
@@ -443,6 +563,7 @@ private final class PictureInPictureManagerIOS15: NSObject,
   ) {
     stateLock.lock()
     isPictureInPictureActive = true
+    hasPrimingFrame = false
     stateLock.unlock()
   }
 
@@ -451,6 +572,7 @@ private final class PictureInPictureManagerIOS15: NSObject,
   ) {
     stateLock.lock()
     isPictureInPictureActive = false
+    hasPrimingFrame = true
     stateLock.unlock()
   }
 
