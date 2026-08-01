@@ -86,7 +86,7 @@ dependencies:
   file_picker:
     git:
       url: https://github.com/miguelpruivo/flutter_file_picker.git
-      ref: 2f3fa1f93519b24a2d0e52ad4c45d72024b51114
+      ref: 2ba94f8266e5062b0813d75949fc9d5c772e14ca
   fixnum: ^1.1.1
   fl_chart: ^1.0.0
   flex_seed_scheme: ^4.0.1

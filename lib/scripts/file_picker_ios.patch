@@ -1,0 +1,19 @@
+diff --git a/darwin/file_picker/Sources/file_picker/IOSFilePickerHandler.swift b/darwin/file_picker/Sources/file_picker/IOSFilePickerHandler.swift
+--- a/darwin/file_picker/Sources/file_picker/IOSFilePickerHandler.swift
++++ b/darwin/file_picker/Sources/file_picker/IOSFilePickerHandler.swift
+@@ -260,2 +260,5 @@
+-        let tempFile = URL(fileURLWithPath: NSTemporaryDirectory())
+-            .appendingPathComponent(fileName)
++        guard let cachesURL = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first else {
++            return
++        }
++
++        let tempFile = cachesURL.appendingPathComponent(fileName)
+@@ -335,2 +338,5 @@
+-        let destinationURL = URL(fileURLWithPath: NSTemporaryDirectory())
+-            .appendingPathComponent(sourceURL.lastPathComponent)
++        guard let cachesURL = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first else {
++            return nil
++        }
++
++        let destinationURL = cachesURL.appendingPathComponent(sourceURL.lastPathComponent)

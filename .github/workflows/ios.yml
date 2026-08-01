@@ -37,6 +37,10 @@ jobs:
       - name: Resolve dependencies
         run: flutter pub get
 
+      - name: Patch file_picker iOS
+        shell: pwsh
+        run: lib/scripts/patch_file_picker_ios.ps1
+
       - name: Patch media-kit iOS PiP
         shell: pwsh
         run: lib/scripts/patch_media_kit_ios.ps1
