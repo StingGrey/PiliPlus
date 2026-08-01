@@ -38,9 +38,46 @@ if ($beforeBlob -ne $expectedBeforeBlob) {
   throw "Unexpected file_picker iOS source before patch: $beforeBlob"
 }
 
-$patchPath = Join-Path $PSScriptRoot 'file_picker_ios.patch'
-git -C $packageRoot apply --check --whitespace=nowarn $patchPath
-git -C $packageRoot apply --whitespace=nowarn $patchPath
+$source = Get-Content -LiteralPath $targetPath -Raw -Encoding UTF8
+$source = $source.Replace("`r`n", "`n")
+$replacements = @(
+  @{
+    Old = @(
+      '        let tempFile = URL(fileURLWithPath: NSTemporaryDirectory())',
+      '            .appendingPathComponent(fileName)'
+    ) -join "`n"
+    New = @(
+      '        guard let cachesURL = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first else {',
+      '            return',
+      '        }',
+      '',
+      '        let tempFile = cachesURL.appendingPathComponent(fileName)'
+    ) -join "`n"
+  },
+  @{
+    Old = @(
+      '        let destinationURL = URL(fileURLWithPath: NSTemporaryDirectory())',
+      '            .appendingPathComponent(sourceURL.lastPathComponent)'
+    ) -join "`n"
+    New = @(
+      '        guard let cachesURL = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first else {',
+      '            return nil',
+      '        }',
+      '',
+      '        let destinationURL = cachesURL.appendingPathComponent(sourceURL.lastPathComponent)'
+    ) -join "`n"
+  }
+)
+
+foreach ($replacement in $replacements) {
+  if (-not $source.Contains($replacement.Old)) {
+    throw 'Expected file_picker iOS source block was not found'
+  }
+  $source = $source.Replace($replacement.Old, $replacement.New)
+}
+
+$utf8NoBom = [System.Text.UTF8Encoding]::new($false)
+[System.IO.File]::WriteAllText($targetPath, $source, $utf8NoBom)
 
 $afterBlob = git -C $packageRoot hash-object -- $targetPath
 if ($afterBlob -ne $expectedAfterBlob) {
