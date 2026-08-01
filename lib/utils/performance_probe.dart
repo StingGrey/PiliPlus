@@ -18,7 +18,9 @@ enum RcmdRenderMode {
 
 abstract final class PerformanceProbe {
   static final ValueNotifier<RcmdRenderMode> rcmdRenderMode = ValueNotifier(
-    RcmdRenderMode.memoryImage,
+    performanceHudEnabled
+        ? RcmdRenderMode.memoryImage
+        : RcmdRenderMode.diskCachedImage,
   );
 
   static int _cardBuilds = 0;

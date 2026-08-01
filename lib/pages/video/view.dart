@@ -496,13 +496,10 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
                     () {
                       final scrollRatio =
                           videoDetailController.scrollRatio.value;
-                      Brightness? statusBarIconBrightness;
-                      if (Platform.isAndroid) {
-                        statusBarIconBrightness =
-                            isPortrait && scrollRatio >= 0.5
-                            ? colorScheme.brightness.reverse
-                            : .light;
-                      }
+                      final statusBarIconBrightness =
+                          isPortrait && scrollRatio >= 0.5
+                          ? colorScheme.brightness.reverse
+                          : Brightness.light;
                       final backgroundColor = isPortrait && scrollRatio > 0
                           ? Color.lerp(
                               Colors.black,

@@ -144,8 +144,9 @@ class VideoCardV extends StatelessWidget {
               type: .emote,
               borderRadius: const .vertical(top: .circular(12)),
               memoryOnly:
-                  renderMode == RcmdRenderMode.memoryImage ||
-                  renderMode == RcmdRenderMode.lightweight,
+                  performanceHudEnabled &&
+                  (renderMode == RcmdRenderMode.memoryImage ||
+                      renderMode == RcmdRenderMode.lightweight),
             )
           else
             ColoredBox(

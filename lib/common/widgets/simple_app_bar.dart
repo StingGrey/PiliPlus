@@ -20,7 +20,7 @@ class SimpleAppBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle(
-        statusBarBrightness: .light,
+        statusBarBrightness: statusBarIconBrightness.reverse,
         statusBarColor: Colors.transparent,
         statusBarIconBrightness: statusBarIconBrightness,
         systemStatusBarContrastEnforced: false,
